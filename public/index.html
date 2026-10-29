@@ -13,9 +13,11 @@
         #messages li { padding: 10px 14px; border-radius: 8px; background: #e4e6eb; max-width: 85%; word-break: break-word; }
         #messages li.admin { background: #0084ff; color: white; align-self: flex-start; }
         #messages li.self { background: #0084ff; color: white; align-self: flex-end; }
-        #chat-form { display: flex; border-top: 1px solid #dee2e6; padding: 10px; background: #fff; gap: 8px; }
+        #messages img, #messages video { max-width: 180px; border-radius: 6px; display: block; margin-top: 5px; }
+        #chat-form { display: flex; border-top: 1px solid #dee2e6; padding: 10px; background: #fff; gap: 8px; align-items: center; }
         #msg-input { flex: 1; padding: 12px; border: 1px solid #ccc; border-radius: 20px; outline: none; }
-        button { padding: 10px 16px; background: #0084ff; color: white; border: none; border-radius: 20px; cursor: pointer; font-weight: bold; }
+        .file-btn { background: #e4e6eb; color: #333; padding: 10px 12px; border-radius: 20px; cursor: pointer; font-size: 0.85rem; font-weight: bold; }
+        button[type="submit"] { padding: 10px 16px; background: #0084ff; color: white; border: none; border-radius: 20px; cursor: pointer; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -24,7 +26,9 @@
         <div class="chat-header">💬 Discussion avec le Support</div>
         <ul id="messages"></ul>
         <form id="chat-form">
-            <input type="text" id="msg-input" placeholder="Écrivez votre message..." autocomplete="off" required />
+            <label class="file-btn" for="file-input">📁</label>
+            <input type="file" id="file-input" style="display: none;" accept="image/*,video/*" />
+            <input type="text" id="msg-input" placeholder="Écrivez votre message..." autocomplete="off" />
             <button type="submit">Envoyer</button>
         </form>
     </div>
@@ -32,34 +36,61 @@
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
-        // Plus de demande de pseudo, le serveur l'attribue automatiquement à la connexion !
 
         const form = document.getElementById('chat-form');
         const inputMsg = document.getElementById('msg-input');
+        const fileInput = document.getElementById('file-input');
         const messagesUl = document.getElementById('messages');
 
         form.addEventListener('submit', (e) => {
             e.preventDefault();
             const text = inputMsg.value.trim();
-            if (text) {
-                socket.emit('clientMessage', { text });
-                
-                // Affichage local immédiat
-                const li = document.createElement('li');
-                li.className = 'self';
-                li.textContent = text;
-                messagesUl.appendChild(li);
-                messagesUl.scrollTop = messagesUl.scrollHeight;
-                
-                inputMsg.value = '';
+            const file = fileInput.files[0];
+
+            if (text || file) {
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = function(event) {
+                        socket.emit('clientMessage', { text: text, file: event.target.result, fileType: file.type });
+                        appendSelfMessage(text, event.target.result, file.type);
+                        resetForm();
+                    };
+                    reader.readAsDataURL(file);
+                } else {
+                    socket.emit('clientMessage', { text: text, file: null, fileType: null });
+                    appendSelfMessage(text, null, null);
+                    resetForm();
+                }
             }
         });
 
-        // Réception de la réponse du support admin
+        function resetForm() {
+            inputMsg.value = '';
+            fileInput.value = '';
+        }
+
+        function appendSelfMessage(text, file, fileType) {
+            const li = document.createElement('li');
+            li.className = 'self';
+            let content = text;
+            if (file) {
+                if (fileType.startsWith('image/')) content += `<img src="${file}"/>`;
+                else if (fileType.startsWith('video/')) content += `<video src="${file}" controls></video>`;
+            }
+            li.innerHTML = content;
+            messagesUl.appendChild(li);
+            messagesUl.scrollTop = messagesUl.scrollHeight;
+        }
+
         socket.on('privateMessage', (data) => {
             const li = document.createElement('li');
             li.className = 'admin';
-            li.innerHTML = `<strong>${data.author} :</strong> ${data.text}`;
+            let content = `<strong>${data.author} :</strong> ${data.text}`;
+            if (data.file) {
+                if (data.fileType.startsWith('image/')) content += `<img src="${data.file}"/>`;
+                else if (data.fileType.startsWith('video/')) content += `<video src="${data.file}" controls></video>`;
+            }
+            li.innerHTML = content;
             messagesUl.appendChild(li);
             messagesUl.scrollTop = messagesUl.scrollHeight;
         });
