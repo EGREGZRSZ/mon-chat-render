@@ -12,20 +12,21 @@ app.use(express.static(path.join(__dirname, 'public')));
 let clients = {};
 
 io.on('connection', (socket) => {
-    // ID unique automatique attribué par Socket.IO
     const uniqueId = socket.id;
-    console.log('Nouvelle connexion avec ID unique :', uniqueId);
+    
+    // Génération automatique d'un pseudo unique basé sur l'ID
+    const randomPseudo = `Utilisateur_${uniqueId.substring(0, 5)}`;
+    
+    clients[uniqueId] = { 
+        id: uniqueId, 
+        pseudo: randomPseudo,
+        joinedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
 
-    // Un client s'enregistre
-    socket.on('registerClient', (pseudo) => {
-        clients[uniqueId] = { 
-            id: uniqueId, 
-            pseudo: pseudo || 'Client',
-            joinedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        };
-        // Diffuse la liste actualisée avec les IDs uniques aux admins
-        io.emit('updateUserList', Object.values(clients));
-    });
+    console.log(`Nouveau client connecté automatiquement : ${randomPseudo} (${uniqueId})`);
+    
+    // Diffuse la liste actualisée aux admins
+    io.emit('updateUserList', Object.values(clients));
 
     // Message d'un client
     socket.on('clientMessage', (data) => {
@@ -48,9 +49,7 @@ io.on('connection', (socket) => {
             text: data.text,
             time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         };
-        // Envoi ciblé au client grâce à son ID unique automatique
         io.to(data.targetSocketId).emit('privateMessage', replyData);
-        
         io.emit('adminReplySent', { targetSocketId: data.targetSocketId, ...replyData });
     });
 
