@@ -7,16 +7,25 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-// Sert les fichiers statiques de l'interface client
+// Sert tous les fichiers du dossier public (index.html et admin.html)
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Gestion des connexions et des messages en temps réel
 io.on('connection', (socket) => {
     console.log('Un utilisateur s\'est connecté :', socket.id);
 
+    // 1. Message venant d'un utilisateur classique
     socket.on('chatMessage', (data) => {
-        // Rediffuse le message à tous les clients connectés
         io.emit('chatMessage', data);
+    });
+
+    // 2. Réponse manuelle venant du panneau admin
+    socket.on('adminMessage', (data) => {
+        const adminReply = {
+            author: '👑 Administrateur',
+            text: data.text
+        };
+        // Diffuse la réponse de l'admin à tout le monde sur le chat
+        io.emit('chatMessage', adminReply);
     });
 
     socket.on('disconnect', () => {
