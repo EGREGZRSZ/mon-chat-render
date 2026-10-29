@@ -3,30 +3,48 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Panneau d'administration - Chat</title>
+    <title>Messenger Admin - Support</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: Arial, sans-serif; background: #2c3e50; color: white; display: flex; justify-content: center; align-items: center; height: 100vh; }
-        #admin-container { width: 500px; background: #34495e; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); overflow: hidden; display: flex; flex-direction: column; height: 600px; }
-        .admin-header { background: #e74c3c; color: white; padding: 15px; text-align: center; font-weight: bold; }
-        #messages { flex: 1; padding: 15px; overflow-y: auto; list-style-type: none; display: flex; flex-direction: column; gap: 8px; background: #2c3e50; }
-        #messages li { padding: 10px; border-radius: 6px; background: #4e6073; word-break: break-word; }
-        #messages li strong { color: #f39c12; }
-        #admin-form { display: flex; border-top: 1px solid #4e6073; padding: 12px; background: #34495e; gap: 8px; }
-        #admin-pseudo { width: 30%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; }
-        #msg-input { flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 6px; }
-        button { padding: 10px 18px; background: #e74c3c; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
-        button:hover { background: #c0392b; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; height: 100vh; display: flex; }
+        
+        /* Sidebar Liste des clients */
+        #sidebar { width: 320px; background: white; border-right: 1px solid #ddd; display: flex; flex-direction: column; }
+        .sidebar-header { padding: 20px; font-size: 1.2rem; font-weight: bold; background: #0084ff; color: white; }
+        #user-list { list-style: none; overflow-y: auto; flex: 1; }
+        #user-list li { padding: 15px 20px; border-bottom: 1px solid #f0f0f0; cursor: pointer; display: flex; align-items: center; gap: 10px; }
+        #user-list li:hover, #user-list li.active { background: #f0f2f5; }
+        .avatar { width: 40px; height: 40px; background: #ccc; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; color: white; background: linear-gradient(135deg, #00c6ff, #0072ff); }
+
+        /* Zone de Chat principale */
+        #chat-area { flex: 1; display: flex; flex-direction: column; background: #fff; }
+        .chat-header { padding: 20px; font-size: 1.1rem; font-weight: bold; border-bottom: 1px solid #ddd; background: #fafafa; }
+        #messages { flex: 1; padding: 20px; overflow-y: auto; list-style: none; display: flex; flex-direction: column; gap: 10px; background: #fdfdfd; }
+        #messages li { padding: 10px 14px; border-radius: 8px; max-width: 70%; word-break: break-word; background: #e4e6eb; }
+        #messages li.admin-msg { background: #0084ff; color: white; align-self: flex-end; }
+        
+        #chat-form { display: flex; padding: 15px; border-top: 1px solid #ddd; background: #fff; gap: 10px; }
+        #msg-input { flex: 1; padding: 12px; border: 1px solid #ccc; border-radius: 20px; outline: none; }
+        button { padding: 10px 20px; background: #0084ff; color: white; border: none; border-radius: 20px; cursor: pointer; font-weight: bold; }
+        .no-chat { display: flex; align-items: center; justify-content: center; height: 100%; color: #888; font-size: 1.1rem; }
     </style>
 </head>
 <body>
 
-    <div id="admin-container">
-        <div class="admin-header">🛠️ Panneau Admin Personnalisé</div>
+    <!-- Sidebar type Messenger -->
+    <div id="sidebar">
+        <div class="sidebar-header">Conversations Clients</div>
+        <ul id="user-list">
+            <li class="no-chat">Aucun client connecté</li>
+        </ul>
+    </div>
+
+    <!-- Zone de discussion active -->
+    <div id="chat-area">
+        <div class="chat-header" id="current-chat-title">Sélectionnez une conversation à gauche</div>
         <ul id="messages"></ul>
-        <form id="admin-form">
-            <input type="text" id="admin-pseudo" placeholder="Votre Pseudo" value="Admin" required />
-            <input type="text" id="msg-input" placeholder="Votre réponse..." autocomplete="off" required />
+        <form id="chat-form" style="display: none;">
+            <input type="text" id="msg-input" placeholder="Répondre au client..." autocomplete="off" required />
             <button type="submit">Envoyer</button>
         </form>
     </div>
@@ -34,30 +52,90 @@
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
+        let activeUserId = null;
+        let conversations = {}; // Stocke les messages par ID de client
 
-        const form = document.getElementById('admin-form');
-        const inputMsg = document.getElementById('msg-input');
-        const inputPseudo = document.getElementById('admin-pseudo');
+        const userListUl = document.getElementById('user-list');
         const messagesUl = document.getElementById('messages');
+        const chatForm = document.getElementById('chat-form');
+        const inputMsg = document.getElementById('msg-input');
+        const chatTitle = document.getElementById('current-chat-title');
 
-        form.addEventListener('submit', (e) => {
+        // 1. Mise à jour de la liste des clients connectés
+        socket.on('updateUserList', (users) => {
+            userListUl.innerHTML = '';
+            if (users.length === 0) {
+                userListUl.innerHTML = '<li style="padding:20px; color:#888;">Aucun client en ligne</li>';
+                return;
+            }
+
+            users.forEach(user => {
+                if (!conversations[user.id]) {
+                    conversations[user.id] = [];
+                }
+                const li = document.createElement('li');
+                if (user.id === activeUserId) li.classList.add('active');
+                
+                li.innerHTML = `
+                    <div class="avatar">${user.pseudo.charAt(0).toUpperCase()}</div>
+                    <div>
+                        <strong>${user.pseudo}</strong>
+                        <div style="font-size:0.8rem; color:green;">En ligne</div>
+                    </div>
+                `;
+                li.onclick = () => selectUser(user.id, user.pseudo);
+                userListUl.appendChild(li);
+            });
+        });
+
+        // 2. Sélectionner un utilisateur pour voir sa conversation
+        function selectUser(userId, pseudo) {
+            activeUserId = userId;
+            chatTitle.textContent = `Discussion avec : ${pseudo}`;
+            chatForm.style.display = 'flex';
+            renderMessages();
+        }
+
+        // 3. Réception d'un message d'un client
+        socket.on('newClientMessage', (data) => {
+            if (!conversations[data.senderId]) {
+                conversations[data.senderId] = [];
+            }
+            conversations[data.senderId].push({ author: data.author, text: data.text, type: 'client' });
+            if (activeUserId === data.senderId) renderMessages();
+        });
+
+        // 4. Réception de la réponse admin confirmée
+        socket.on('adminReplySent', (data) => {
+            if (!conversations[data.targetSocketId]) {
+                conversations[data.targetSocketId] = [];
+            }
+            conversations[data.targetSocketId].push({ author: data.author, text: data.text, type: 'admin' });
+            if (activeUserId === data.targetSocketId) renderMessages();
+        });
+
+        // 5. Envoi de la réponse de l'admin
+        chatForm.addEventListener('submit', (e) => {
             e.preventDefault();
             const text = inputMsg.value.trim();
-            const author = inputPseudo.value.trim() || 'Admin';
-
-            if (text) {
-                // Envoi du pseudo personnalisé et du message au serveur
-                socket.emit('adminMessage', { author, text });
+            if (text && activeUserId) {
+                socket.emit('adminReply', { targetSocketId: activeUserId, text });
                 inputMsg.value = '';
             }
         });
 
-        socket.on('chatMessage', (data) => {
-            const li = document.createElement('li');
-            li.innerHTML = `<strong>${data.author} :</strong> ${data.text}`;
-            messagesUl.appendChild(li);
+        // Afficher les messages de la conversation active
+        function renderMessages() {
+            messagesUl.innerHTML = '';
+            const msgs = conversations[activeUserId] || [];
+            msgs.forEach(m => {
+                const li = document.createElement('li');
+                if (m.type === 'admin') li.classList.add('admin-msg');
+                li.innerHTML = `<strong>${m.author} :</strong> ${m.text}`;
+                messagesUl.appendChild(li);
+            });
             messagesUl.scrollTop = messagesUl.scrollHeight;
-        });
+        }
     </script>
 </body>
 </html>
