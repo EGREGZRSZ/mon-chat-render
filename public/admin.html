@@ -13,6 +13,7 @@
         #messages li { padding: 10px; border-radius: 6px; background: #4e6073; word-break: break-word; }
         #messages li strong { color: #f39c12; }
         #admin-form { display: flex; border-top: 1px solid #4e6073; padding: 12px; background: #34495e; gap: 8px; }
+        #admin-pseudo { width: 30%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; }
         #msg-input { flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 6px; }
         button { padding: 10px 18px; background: #e74c3c; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
         button:hover { background: #c0392b; }
@@ -21,11 +22,12 @@
 <body>
 
     <div id="admin-container">
-        <div class="admin-header">🛠️ Panneau de Réponse Administrateur</div>
+        <div class="admin-header">🛠️ Panneau Admin Personnalisé</div>
         <ul id="messages"></ul>
         <form id="admin-form">
-            <input type="text" id="msg-input" placeholder="Répondre en tant qu'admin..." autocomplete="off" required />
-            <button type="submit">Envoyer la réponse</button>
+            <input type="text" id="admin-pseudo" placeholder="Votre Pseudo" value="Admin" required />
+            <input type="text" id="msg-input" placeholder="Votre réponse..." autocomplete="off" required />
+            <button type="submit">Envoyer</button>
         </form>
     </div>
 
@@ -35,21 +37,21 @@
 
         const form = document.getElementById('admin-form');
         const inputMsg = document.getElementById('msg-input');
+        const inputPseudo = document.getElementById('admin-pseudo');
         const messagesUl = document.getElementById('messages');
 
-        // Envoi de la réponse admin au serveur
         form.addEventListener('submit', (e) => {
             e.preventDefault();
             const text = inputMsg.value.trim();
+            const author = inputPseudo.value.trim() || 'Admin';
 
             if (text) {
-                // On envoie un événement spécifique pour l'admin
-                socket.emit('adminMessage', { text });
+                // Envoi du pseudo personnalisé et du message au serveur
+                socket.emit('adminMessage', { author, text });
                 inputMsg.value = '';
             }
         });
 
-        // Affichage des messages sur le panneau admin
         socket.on('chatMessage', (data) => {
             const li = document.createElement('li');
             li.innerHTML = `<strong>${data.author} :</strong> ${data.text}`;
