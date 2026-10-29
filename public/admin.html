@@ -6,14 +6,18 @@
     <title>Messenger Admin - Support</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; height: 100vh; display: flex; position: relative; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; height: 100vh; display: flex; position: relative; overflow: hidden; }
         
-        #sidebar { width: 350px; background: white; border-right: 1px solid #ddd; display: flex; flex-direction: column; }
+        #sidebar { width: 360px; background: white; border-right: 1px solid #ddd; display: flex; flex-direction: column; }
         .sidebar-header { padding: 20px; font-size: 1.2rem; font-weight: bold; background: #0084ff; color: white; }
         #user-list { list-style: none; overflow-y: auto; flex: 1; }
-        #user-list li { padding: 15px 20px; border-bottom: 1px solid #f0f0f0; cursor: pointer; display: flex; align-items: center; gap: 12px; }
+        #user-list li { padding: 15px 20px; border-bottom: 1px solid #f0f0f0; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
         #user-list li:hover, #user-list li.active { background: #f0f2f5; }
+        .user-info { display: flex; align-items: center; gap: 12px; overflow: hidden; flex: 1; }
         .avatar { width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; color: white; background: linear-gradient(135deg, #00c6ff, #0072ff); flex-shrink: 0; }
+        
+        .delete-btn { background: #ff3b30; color: white; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; font-weight: bold; }
+        .delete-btn:hover { background: #d32f2f; }
 
         #chat-area { flex: 1; display: flex; flex-direction: column; background: #fff; }
         .chat-header { padding: 20px; font-size: 1.1rem; font-weight: bold; border-bottom: 1px solid #ddd; background: #fafafa; }
@@ -25,24 +29,22 @@
         #chat-form { display: flex; padding: 15px; border-top: 1px solid #ddd; background: #fff; gap: 10px; align-items: center; }
         #msg-input { flex: 1; padding: 12px; border: 1px solid #ccc; border-radius: 20px; outline: none; }
         .file-btn { background: #e4e6eb; color: #333; padding: 10px 15px; border-radius: 20px; cursor: pointer; font-weight: bold; font-size: 0.9rem; }
-        .file-btn:hover { background: #d8dadf; }
         button[type="submit"] { padding: 10px 20px; background: #0084ff; color: white; border: none; border-radius: 20px; cursor: pointer; font-weight: bold; }
         
-        /* Popup de Notification */
-        #notification-popup { position: fixed; top: 20px; right: 20px; background: #2c3e50; color: white; padding: 15px 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); display: none; z-index: 1000; animation: fadeIn 0.3s ease-in-out; }
-        #notification-popup strong { color: #00c6ff; display: block; margin-bottom: 3px; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
-        
+        /* Conteneur de Popups de Notification (Style Messenger) */
+        #notification-container { position: fixed; top: 20px; right: 20px; display: flex; flex-direction: column; gap: 10px; z-index: 1000; pointer-events: none; }
+        .toast { background: #242526; color: white; padding: 15px 20px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); pointer-events: auto; display: flex; flex-direction: column; gap: 4px; min-width: 260px; animation: slideIn 0.3s ease-out; border-left: 5px solid #0084ff; }
+        .toast strong { color: #0084ff; font-size: 0.95rem; }
+        .toast span { font-size: 0.85rem; color: #b0b3b8; }
+        @keyframes slideIn { from { opacity: 0; transform: translateX(50px); } to { opacity: 1; transform: translateX(0); } }
+
         .no-chat { display: flex; align-items: center; justify-content: center; height: 100%; color: #888; font-size: 1.1rem; }
     </style>
 </head>
 <body>
 
-    <!-- Popup de notification -->
-    <div id="notification-popup">
-        <strong id="notif-title">Nouveau message</strong>
-        <span id="notif-text"></span>
-    </div>
+    <!-- Conteneur des popups -->
+    <div id="notification-container"></div>
 
     <div id="sidebar">
         <div class="sidebar-header">Conversations Clients</div>
@@ -55,9 +57,9 @@
         <div class="chat-header" id="current-chat-title">Sélectionnez une conversation à gauche</div>
         <ul id="messages"></ul>
         <form id="chat-form" style="display: none;">
-            <label class="file-btn" for="file-input">📁 Fichier</label>
+            <label class="file-btn" for="file-input">📁</label>
             <input type="file" id="file-input" style="display: none;" accept="image/*,video/*" />
-            <input type="text" id="msg-input" placeholder="Répondre à ce client..." autocomplete="off" />
+            <input type="text" id="msg-input" placeholder="Répondre au client..." autocomplete="off" />
             <button type="submit">Envoyer</button>
         </form>
     </div>
@@ -74,40 +76,80 @@
         const inputMsg = document.getElementById('msg-input');
         const fileInput = document.getElementById('file-input');
         const chatTitle = document.getElementById('current-chat-title');
-        const popup = document.getElementById('notification-popup');
-        const notifTitle = document.getElementById('notif-title');
-        const notifText = document.getElementById('notif-text');
+        const notifContainer = document.getElementById('notification-container');
+
+        // Fonction pour afficher une popup de type messagerie
+        function showToast(title, text) {
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.innerHTML = `<strong>${title}</strong><span>${text}</span>`;
+            notifContainer.appendChild(toast);
+
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transition = 'opacity 0.3s ease';
+                setTimeout(() => toast.remove(), 300);
+            }, 4000);
+        }
+
+        // Notification d'un nouvel utilisateur connecté
+        socket.on('newUserNotification', (data) => {
+            showToast("Nouveau client", `${data.pseudo} vient de se connecter.`);
+        });
 
         socket.on('updateUserList', (users) => {
             userListUl.innerHTML = '';
             if (users.length === 0) {
-                userListUl.innerHTML = '<li style="padding:20px; color:#888;">Aucun client en ligne</li>';
+                userListUl.innerHTML = '<li style="padding:20px; color:#888; justify-content:center;">Aucun client en ligne</li>';
                 return;
             }
+
             users.forEach(user => {
                 if (!conversations[user.id]) conversations[user.id] = [];
                 const li = document.createElement('li');
                 if (user.id === activeUserId) li.classList.add('active');
+                
                 li.innerHTML = `
-                    <div class="avatar">${user.pseudo.charAt(0).toUpperCase()}</div>
-                    <div style="overflow:hidden;">
-                        <strong>${user.pseudo}</strong>
-                        <div style="font-size:0.75rem; color:#666;">ID: ${user.id}</div>
+                    <div class="user-info">
+                        <div class="avatar">${user.pseudo.charAt(0).toUpperCase()}</div>
+                        <div style="overflow:hidden;">
+                            <strong>${user.pseudo}</strong>
+                            <div style="font-size:0.75rem; color:#666;">ID: ${user.id}</div>
+                        </div>
                     </div>
+                    <button class="delete-btn" title="Supprimer la conversation">Supprimer</button>
                 `;
-                li.onclick = () => selectUser(user.id, user.pseudo);
+
+                // Clic pour sélectionner la conversation (sauf sur le bouton supprimer)
+                li.querySelector('.user-info').onclick = () => selectUser(user.id, user.pseudo);
+                
+                // Clic pour supprimer la conversation
+                li.querySelector('.delete-btn').onclick = (e) => {
+                    e.stopPropagation();
+                    if (confirm(`Voulez-vous vraiment supprimer la conversation avec ${user.pseudo} ?`)) {
+                        socket.emit('deleteConversation', user.id);
+                        delete conversations[user.id];
+                        if (activeUserId === user.id) {
+                            activeUserId = null;
+                            chatTitle.textContent = "Sélectionnez une conversation à gauche";
+                            messagesUl.innerHTML = '';
+                            chatForm.style.display = 'none';
+                        }
+                    }
+                };
+
                 userListUl.appendChild(li);
             });
         });
 
         function selectUser(userId, pseudo) {
             activeUserId = userId;
-            chatTitle.textContent = `Discussion avec ${pseudo} (ID: ${userId})`;
+            chatTitle.textContent = `Discussion avec ${pseudo}`;
             chatForm.style.display = 'flex';
             renderMessages();
         }
 
-        // Réception d'un message client + affichage de la Popup
+        // Réception d'un message client + Popup
         socket.on('newClientMessage', (data) => {
             if (!conversations[data.senderId]) conversations[data.senderId] = [];
             conversations[data.senderId].push({ author: data.author, text: data.text, file: data.file, fileType: data.fileType, type: 'client' });
@@ -115,11 +157,7 @@
             if (activeUserId === data.senderId) {
                 renderMessages();
             } else {
-                // Affichage de la Popup de notification
-                notifTitle.textContent = `Message de ${data.author}`;
-                notifText.textContent = data.text || '[Fichier multimédia]';
-                popup.style.display = 'block';
-                setTimeout(() => { popup.style.display = 'none'; }, 4000);
+                showToast(`Message de ${data.author}`, data.text || '[Fichier multimédia]');
             }
         });
 
@@ -129,7 +167,6 @@
             if (activeUserId === data.targetSocketId) renderMessages();
         });
 
-        // Envoi de la réponse (Texte et/ou Fichier)
         chatForm.addEventListener('submit', (e) => {
             e.preventDefault();
             const text = inputMsg.value.trim();
@@ -139,22 +176,12 @@
                 if (file) {
                     const reader = new FileReader();
                     reader.onload = function(event) {
-                        socket.emit('adminReply', {
-                            targetSocketId: activeUserId,
-                            text: text,
-                            file: event.target.result,
-                            fileType: file.type
-                        });
+                        socket.emit('adminReply', { targetSocketId: activeUserId, text, file: event.target.result, fileType: file.type });
                         resetForm();
                     };
                     reader.readAsDataURL(file);
                 } else {
-                    socket.emit('adminReply', {
-                        targetSocketId: activeUserId,
-                        text: text,
-                        file: null,
-                        fileType: null
-                    });
+                    socket.emit('adminReply', { targetSocketId: activeUserId, text, file: null, fileType: null });
                     resetForm();
                 }
             }
@@ -171,14 +198,10 @@
             msgs.forEach(m => {
                 const li = document.createElement('li');
                 if (m.type === 'admin') li.classList.add('admin-msg');
-                
                 let content = `<strong>${m.author} :</strong> ${m.text}`;
                 if (m.file) {
-                    if (m.fileType.startsWith('image/')) {
-                        content += `<img src="${m.file}" alt="image"/>`;
-                    } else if (m.fileType.startsWith('video/')) {
-                        content += `<video src="${m.file}" controls></video>`;
-                    }
+                    if (m.fileType.startsWith('image/')) content += `<img src="${m.file}"/>`;
+                    else if (m.fileType.startsWith('video/')) content += `<video src="${m.file}" controls></video>`;
                 }
                 li.innerHTML = content;
                 messagesUl.appendChild(li);
