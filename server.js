@@ -6,7 +6,7 @@ const path = require('path');
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
-    maxHttpBufferSize: 10 * 1024 * 1024 // Limite à 10 Mo pour les fichiers multimédias
+    maxHttpBufferSize: 10 * 1024 * 1024
 });
 
 app.use(express.static(path.join(__dirname, 'public')));
@@ -20,17 +20,19 @@ io.on('connection', (socket) => {
     clients[uniqueId] = { 
         id: uniqueId, 
         pseudo: randomPseudo,
-        joinedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        unreadCount: 0, // Compteur de messages non lus
+        lastMessage: 'A rejoint la discussion'
     };
 
-    // Notifie tous les admins qu'un nouvel utilisateur est arrivé (déclenche une popup)
     io.emit('newUserNotification', { pseudo: randomPseudo });
     io.emit('updateUserList', Object.values(clients));
 
-    // Message d'un client
     socket.on('clientMessage', (data) => {
         const client = clients[uniqueId];
         if (client) {
+            client.lastMessage = data.text || '[Média]';
+            client.unreadCount += 1; // Incrémente les non lus
+
             const messageData = {
                 senderId: uniqueId,
                 author: client.pseudo,
@@ -40,11 +42,14 @@ io.on('connection', (socket) => {
                 time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
             };
             io.emit('newClientMessage', messageData);
+            io.emit('updateUserList', Object.values(clients));
         }
     });
 
-    // Réponse de l'admin
     socket.on('adminReply', (data) => {
+        if (clients[data.targetSocketId]) {
+            clients[data.targetSocketId].lastMessage = `Admin: ${data.text || '[Média]'}`;
+        }
         const replyData = {
             author: '👑 Support Admin',
             text: data.text || '',
@@ -54,15 +59,21 @@ io.on('connection', (socket) => {
         };
         io.to(data.targetSocketId).emit('privateMessage', replyData);
         io.emit('adminReplySent', { targetSocketId: data.targetSocketId, ...replyData });
+        io.emit('updateUserList', Object.values(clients));
     });
 
-    // Suppression d'une conversation par l'admin
+    // Lorsque l'admin sélectionne une conversation, on remet les compteurs à zéro
+    socket.on('markAsRead', (targetSocketId) => {
+        if (clients[targetSocketId]) {
+            clients[targetSocketId].unreadCount = 0;
+            io.emit('updateUserList', Object.values(clients));
+        }
+    });
+
     socket.on('deleteConversation', (targetSocketId) => {
         if (clients[targetSocketId]) {
             delete clients[targetSocketId];
-            // Optionnel : déconnecter proprement le client ou l'informer
             io.to(targetSocketId).emit('conversationClosed');
-            // Mettre à jour la liste chez les admins
             io.emit('updateUserList', Object.values(clients));
         }
     });
