@@ -3,58 +3,65 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chat en direct - Hébergé sur Render</title>
+    <title>Support Client - Chat</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; display: flex; justify-content: center; align-items: center; height: 100vh; }
-        #chat-container { width: 100%; max-width: 450px; background: white; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); overflow: hidden; display: flex; flex-direction: column; height: 600px; }
-        .chat-header { background: #007bff; color: white; padding: 15px; text-align: center; font-weight: bold; font-size: 1.1rem; }
+        #chat-container { width: 100%; max-width: 400px; background: white; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); overflow: hidden; display: flex; flex-direction: column; height: 550px; }
+        .chat-header { background: #0084ff; color: white; padding: 15px; text-align: center; font-weight: bold; }
         #messages { flex: 1; padding: 15px; overflow-y: auto; list-style-type: none; display: flex; flex-direction: column; gap: 8px; }
-        #messages li { padding: 10px 14px; border-radius: 8px; background: #e9ecef; max-width: 80%; word-break: break-word; }
-        #messages li strong { display: block; font-size: 0.8rem; color: #007bff; margin-bottom: 2px; }
-        #chat-form { display: flex; border-top: 1px solid #dee2e6; padding: 12px; background: #fff; gap: 8px; }
-        #pseudonyme { width: 30%; padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 0.9rem; }
-        #msg-input { flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 0.9rem; }
-        button { padding: 10px 18px; background: #007bff; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
-        button:hover { background: #0056b3; }
+        #messages li { padding: 10px 14px; border-radius: 8px; background: #e4e6eb; max-width: 85%; word-break: break-word; }
+        #messages li.admin { background: #0084ff; color: white; align-self: flex-start; }
+        #messages li.self { background: #0084ff; color: white; align-self: flex-end; }
+        #chat-form { display: flex; border-top: 1px solid #dee2e6; padding: 10px; background: #fff; gap: 8px; }
+        #msg-input { flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 20px; outline: none; }
+        button { padding: 10px 16px; background: #0084ff; color: white; border: none; border-radius: 20px; cursor: pointer; font-weight: bold; }
     </style>
 </head>
 <body>
 
     <div id="chat-container">
-        <div class="chat-header">💬 Chat en Ligne</div>
+        <div class="chat-header">💬 Discussion avec le Support</div>
         <ul id="messages"></ul>
         <form id="chat-form">
-            <input type="text" id="pseudonyme" placeholder="Pseudo" value="Moi" required />
-            <input type="text" id="msg-input" placeholder="Votre message..." autocomplete="off" required />
+            <input type="text" id="msg-input" placeholder="Écrivez votre message..." autocomplete="off" required />
             <button type="submit">Envoyer</button>
         </form>
     </div>
 
-    <!-- Script Socket.io injecté automatiquement par le serveur Express -->
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
+        const pseudo = prompt("Entrez votre nom ou pseudo :") || "Client";
+        
+        socket.emit('registerClient', pseudo);
 
         const form = document.getElementById('chat-form');
         const inputMsg = document.getElementById('msg-input');
-        const inputPseudo = document.getElementById('pseudonyme');
         const messagesUl = document.getElementById('messages');
 
         form.addEventListener('submit', (e) => {
             e.preventDefault();
             const text = inputMsg.value.trim();
-            const author = inputPseudo.value.trim() || 'Anonyme';
-
             if (text) {
-                socket.emit('chatMessage', { author, text });
+                socket.emit('clientMessage', { text });
+                
+                // Affichage local immédiat
+                const li = document.createElement('li');
+                li.className = 'self';
+                li.textContent = text;
+                messagesUl.appendChild(li);
+                messagesUl.scrollTop = messagesUl.scrollHeight;
+                
                 inputMsg.value = '';
             }
         });
 
-        socket.on('chatMessage', (data) => {
+        // Réception de la réponse du support admin
+        socket.on('privateMessage', (data) => {
             const li = document.createElement('li');
-            li.innerHTML = `<strong>${data.author}</strong>${data.text}`;
+            li.className = 'admin';
+            li.innerHTML = `<strong>${data.author} :</strong> ${data.text}`;
             messagesUl.appendChild(li);
             messagesUl.scrollTop = messagesUl.scrollHeight;
         });
