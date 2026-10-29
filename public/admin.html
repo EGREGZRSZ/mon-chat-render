@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panneau d'administration - Chat</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: Arial, sans-serif; background: #2c3e50; color: white; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        #admin-container { width: 500px; background: #34495e; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); overflow: hidden; display: flex; flex-direction: column; height: 600px; }
+        .admin-header { background: #e74c3c; color: white; padding: 15px; text-align: center; font-weight: bold; }
+        #messages { flex: 1; padding: 15px; overflow-y: auto; list-style-type: none; display: flex; flex-direction: column; gap: 8px; background: #2c3e50; }
+        #messages li { padding: 10px; border-radius: 6px; background: #4e6073; word-break: break-word; }
+        #messages li strong { color: #f39c12; }
+        #admin-form { display: flex; border-top: 1px solid #4e6073; padding: 12px; background: #34495e; gap: 8px; }
+        #msg-input { flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 6px; }
+        button { padding: 10px 18px; background: #e74c3c; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        button:hover { background: #c0392b; }
+    </style>
+</head>
+<body>
+
+    <div id="admin-container">
+        <div class="admin-header">🛠️ Panneau de Réponse Administrateur</div>
+        <ul id="messages"></ul>
+        <form id="admin-form">
+            <input type="text" id="msg-input" placeholder="Répondre en tant qu'admin..." autocomplete="off" required />
+            <button type="submit">Envoyer la réponse</button>
+        </form>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io();
+
+        const form = document.getElementById('admin-form');
+        const inputMsg = document.getElementById('msg-input');
+        const messagesUl = document.getElementById('messages');
+
+        // Envoi de la réponse admin au serveur
+        form.addEventListener('submit', (e) => {
+            e.preventDefault();
+            const text = inputMsg.value.trim();
+
+            if (text) {
+                // On envoie un événement spécifique pour l'admin
+                socket.emit('adminMessage', { text });
+                inputMsg.value = '';
+            }
+        });
+
+        // Affichage des messages sur le panneau admin
+        socket.on('chatMessage', (data) => {
+            const li = document.createElement('li');
+            li.innerHTML = `<strong>${data.author} :</strong> ${data.text}`;
+            messagesUl.appendChild(li);
+            messagesUl.scrollTop = messagesUl.scrollHeight;
+        });
+    </script>
+</body>
+</html>
