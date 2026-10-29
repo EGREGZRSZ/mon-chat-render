@@ -9,55 +9,58 @@ const io = new Server(server);
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Liste des clients connectés
 let clients = {};
 
 io.on('connection', (socket) => {
-    console.log('Nouvelle connexion :', socket.id);
+    // ID unique automatique attribué par Socket.IO
+    const uniqueId = socket.id;
+    console.log('Nouvelle connexion avec ID unique :', uniqueId);
 
-    // Un client s'enregistre avec son pseudo
+    // Un client s'enregistre
     socket.on('registerClient', (pseudo) => {
-        clients[socket.id] = { id: socket.id, pseudo: pseudo || 'Client' };
-        // Met à jour la liste pour tous les admins connectés
+        clients[uniqueId] = { 
+            id: uniqueId, 
+            pseudo: pseudo || 'Client',
+            joinedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        };
+        // Diffuse la liste actualisée avec les IDs uniques aux admins
         io.emit('updateUserList', Object.values(clients));
     });
 
-    // Un client envoie un message au support
+    // Message d'un client
     socket.on('clientMessage', (data) => {
-        const client = clients[socket.id];
+        const client = clients[uniqueId];
         if (client) {
             const messageData = {
-                senderId: socket.id,
+                senderId: uniqueId,
                 author: client.pseudo,
                 text: data.text,
                 time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
             };
-            // Transmet le message aux administrateurs et au client lui-même
             io.emit('newClientMessage', messageData);
         }
     });
 
-    // L'administrateur répond spécifiquement à un client via son ID
+    // Réponse de l'admin vers un ID unique précis
     socket.on('adminReply', (data) => {
         const replyData = {
             author: '👑 Support Admin',
             text: data.text,
             time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         };
-        // Envoie le message UNIQUEMENT au client concerné
+        // Envoi ciblé au client grâce à son ID unique automatique
         io.to(data.targetSocketId).emit('privateMessage', replyData);
         
-        // Renvoie aussi l'info aux admins pour l'historique
         io.emit('adminReplySent', { targetSocketId: data.targetSocketId, ...replyData });
     });
 
-    // Déconnexion d'un utilisateur
+    // Déconnexion
     socket.on('disconnect', () => {
-        if (clients[socket.id]) {
-            delete clients[socket.id];
+        if (clients[uniqueId]) {
+            delete clients[uniqueId];
             io.emit('updateUserList', Object.values(clients));
         }
-        console.log('Utilisateur déconnecté :', socket.id);
+        console.log('Utilisateur déconnecté :', uniqueId);
     });
 });
 
