@@ -14,7 +14,7 @@
         #messages li.admin { background: #0084ff; color: white; align-self: flex-start; }
         #messages li.self { background: #0084ff; color: white; align-self: flex-end; }
         #chat-form { display: flex; border-top: 1px solid #dee2e6; padding: 10px; background: #fff; gap: 8px; }
-        #msg-input { flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 20px; outline: none; }
+        #msg-input { flex: 1; padding: 12px; border: 1px solid #ccc; border-radius: 20px; outline: none; }
         button { padding: 10px 16px; background: #0084ff; color: white; border: none; border-radius: 20px; cursor: pointer; font-weight: bold; }
     </style>
 </head>
@@ -32,9 +32,7 @@
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
-        const pseudo = prompt("Entrez votre nom ou pseudo :") || "Client";
-        
-        socket.emit('registerClient', pseudo);
+        // Plus de demande de pseudo, le serveur l'attribue automatiquement à la connexion !
 
         const form = document.getElementById('chat-form');
         const inputMsg = document.getElementById('msg-input');
