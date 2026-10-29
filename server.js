@@ -6,7 +6,7 @@ const path = require('path');
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
-    maxHttpBufferSize: 10 * 1024 * 1024 // Permet d'envoyer des fichiers jusqu'à 10 Mo
+    maxHttpBufferSize: 10 * 1024 * 1024 // Limite à 10 Mo pour les fichiers multimédias
 });
 
 app.use(express.static(path.join(__dirname, 'public')));
@@ -23,9 +23,11 @@ io.on('connection', (socket) => {
         joinedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
 
+    // Notifie tous les admins qu'un nouvel utilisateur est arrivé (déclenche une popup)
+    io.emit('newUserNotification', { pseudo: randomPseudo });
     io.emit('updateUserList', Object.values(clients));
 
-    // Réception d'un message (texte ou multimédia) du client
+    // Message d'un client
     socket.on('clientMessage', (data) => {
         const client = clients[uniqueId];
         if (client) {
@@ -33,7 +35,7 @@ io.on('connection', (socket) => {
                 senderId: uniqueId,
                 author: client.pseudo,
                 text: data.text || '',
-                file: data.file || null, // Données du fichier multimédia
+                file: data.file || null,
                 fileType: data.fileType || null,
                 time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
             };
@@ -41,7 +43,7 @@ io.on('connection', (socket) => {
         }
     });
 
-    // Réponse de l'admin (texte ou multimédia) vers un client précis
+    // Réponse de l'admin
     socket.on('adminReply', (data) => {
         const replyData = {
             author: '👑 Support Admin',
@@ -52,6 +54,17 @@ io.on('connection', (socket) => {
         };
         io.to(data.targetSocketId).emit('privateMessage', replyData);
         io.emit('adminReplySent', { targetSocketId: data.targetSocketId, ...replyData });
+    });
+
+    // Suppression d'une conversation par l'admin
+    socket.on('deleteConversation', (targetSocketId) => {
+        if (clients[targetSocketId]) {
+            delete clients[targetSocketId];
+            // Optionnel : déconnecter proprement le client ou l'informer
+            io.to(targetSocketId).emit('conversationClosed');
+            // Mettre à jour la liste chez les admins
+            io.emit('updateUserList', Object.values(clients));
+        }
     });
 
     socket.on('disconnect', () => {
