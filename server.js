@@ -1,12 +1,12 @@
 const express = require('express');
-const http = require('http');
+const http = http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, {
-    maxHttpBufferSize: 10 * 1024 * 1024
+    maxHttpBufferSize: 15 * 1024 * 1024 // Augmenté à 15 Mo pour supporter l'audio/vidéo
 });
 
 app.use(express.static(path.join(__dirname, 'public')));
@@ -20,7 +20,7 @@ io.on('connection', (socket) => {
     clients[uniqueId] = { 
         id: uniqueId, 
         pseudo: randomPseudo,
-        unreadCount: 0, // Compteur de messages non lus
+        unreadCount: 0,
         lastMessage: 'A rejoint la discussion'
     };
 
@@ -30,8 +30,8 @@ io.on('connection', (socket) => {
     socket.on('clientMessage', (data) => {
         const client = clients[uniqueId];
         if (client) {
-            client.lastMessage = data.text || '[Média]';
-            client.unreadCount += 1; // Incrémente les non lus
+            client.lastMessage = data.fileType && data.fileType.startsWith('audio/') ? '🎤 Message vocal' : (data.text || '[Média]');
+            client.unreadCount += 1;
 
             const messageData = {
                 senderId: uniqueId,
@@ -48,7 +48,7 @@ io.on('connection', (socket) => {
 
     socket.on('adminReply', (data) => {
         if (clients[data.targetSocketId]) {
-            clients[data.targetSocketId].lastMessage = `Admin: ${data.text || '[Média]'}`;
+            clients[data.targetSocketId].lastMessage = data.fileType && data.fileType.startsWith('audio/') ? '👑 Admin: 🎤 Vocal' : `Admin: ${data.text || '[Média]'}`;
         }
         const replyData = {
             author: '👑 Support Admin',
@@ -62,7 +62,6 @@ io.on('connection', (socket) => {
         io.emit('updateUserList', Object.values(clients));
     });
 
-    // Lorsque l'admin sélectionne une conversation, on remet les compteurs à zéro
     socket.on('markAsRead', (targetSocketId) => {
         if (clients[targetSocketId]) {
             clients[targetSocketId].unreadCount = 0;
