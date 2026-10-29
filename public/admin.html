@@ -8,15 +8,25 @@
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; height: 100vh; display: flex; position: relative; overflow: hidden; }
         
-        #sidebar { width: 360px; background: white; border-right: 1px solid #ddd; display: flex; flex-direction: column; }
+        #sidebar { width: 380px; background: white; border-right: 1px solid #ddd; display: flex; flex-direction: column; }
         .sidebar-header { padding: 20px; font-size: 1.2rem; font-weight: bold; background: #0084ff; color: white; }
         #user-list { list-style: none; overflow-y: auto; flex: 1; }
         #user-list li { padding: 15px 20px; border-bottom: 1px solid #f0f0f0; cursor: pointer; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-        #user-list li:hover, #user-list li.active { background: #f0f2f5; }
-        .user-info { display: flex; align-items: center; gap: 12px; overflow: hidden; flex: 1; }
-        .avatar { width: 42px; height: 42px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; color: white; background: linear-gradient(135deg, #00c6ff, #0072ff); flex-shrink: 0; }
+        #user-list li:hover { background: #f7f8fa; }
+        #user-list li.active { background: #e6f2ff; }
         
-        .delete-btn { background: #ff3b30; color: white; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; font-weight: bold; }
+        .user-info { display: flex; align-items: center; gap: 12px; overflow: hidden; flex: 1; }
+        .avatar { width: 45px; height: 45px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; color: white; background: linear-gradient(135deg, #00c6ff, #0072ff); flex-shrink: 0; }
+        
+        .user-details { overflow: hidden; flex: 1; }
+        .user-details strong { display: block; font-size: 0.95rem; color: #050505; }
+        .last-msg { font-size: 0.8rem; color: #65676b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+        
+        /* Indicateur de non-lu (Point vert ou badge style WhatsApp) */
+        .unread-badge { background: #25d366; color: white; border-radius: 50%; width: 22px; height: 22px; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: bold; flex-shrink: 0; }
+        
+        .delete-btn { background: #ff3b30; color: white; border: none; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-size: 0.8rem; font-weight: bold; display: none; }
+        #user-list li:hover .delete-btn { display: block; }
         .delete-btn:hover { background: #d32f2f; }
 
         #chat-area { flex: 1; display: flex; flex-direction: column; background: #fff; }
@@ -31,10 +41,9 @@
         .file-btn { background: #e4e6eb; color: #333; padding: 10px 15px; border-radius: 20px; cursor: pointer; font-weight: bold; font-size: 0.9rem; }
         button[type="submit"] { padding: 10px 20px; background: #0084ff; color: white; border: none; border-radius: 20px; cursor: pointer; font-weight: bold; }
         
-        /* Conteneur de Popups de Notification (Style Messenger) */
         #notification-container { position: fixed; top: 20px; right: 20px; display: flex; flex-direction: column; gap: 10px; z-index: 1000; pointer-events: none; }
-        .toast { background: #242526; color: white; padding: 15px 20px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); pointer-events: auto; display: flex; flex-direction: column; gap: 4px; min-width: 260px; animation: slideIn 0.3s ease-out; border-left: 5px solid #0084ff; }
-        .toast strong { color: #0084ff; font-size: 0.95rem; }
+        .toast { background: #242526; color: white; padding: 15px 20px; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); pointer-events: auto; display: flex; flex-direction: column; gap: 4px; min-width: 260px; animation: slideIn 0.3s ease-out; border-left: 5px solid #25d366; }
+        .toast strong { color: #25d366; font-size: 0.95rem; }
         .toast span { font-size: 0.85rem; color: #b0b3b8; }
         @keyframes slideIn { from { opacity: 0; transform: translateX(50px); } to { opacity: 1; transform: translateX(0); } }
 
@@ -43,7 +52,6 @@
 </head>
 <body>
 
-    <!-- Conteneur des popups -->
     <div id="notification-container"></div>
 
     <div id="sidebar">
@@ -78,13 +86,11 @@
         const chatTitle = document.getElementById('current-chat-title');
         const notifContainer = document.getElementById('notification-container');
 
-        // Fonction pour afficher une popup de type messagerie
         function showToast(title, text) {
             const toast = document.createElement('div');
             toast.className = 'toast';
             toast.innerHTML = `<strong>${title}</strong><span>${text}</span>`;
             notifContainer.appendChild(toast);
-
             setTimeout(() => {
                 toast.style.opacity = '0';
                 toast.style.transition = 'opacity 0.3s ease';
@@ -92,7 +98,6 @@
             }, 4000);
         }
 
-        // Notification d'un nouvel utilisateur connecté
         socket.on('newUserNotification', (data) => {
             showToast("Nouveau client", `${data.pseudo} vient de se connecter.`);
         });
@@ -109,21 +114,21 @@
                 const li = document.createElement('li');
                 if (user.id === activeUserId) li.classList.add('active');
                 
+                // Affichage avec aperçu du dernier message et badge de non-lu si supérieur à 0
                 li.innerHTML = `
                     <div class="user-info">
                         <div class="avatar">${user.pseudo.charAt(0).toUpperCase()}</div>
-                        <div style="overflow:hidden;">
+                        <div class="user-details">
                             <strong>${user.pseudo}</strong>
-                            <div style="font-size:0.75rem; color:#666;">ID: ${user.id}</div>
+                            <div class="last-msg">${user.lastMessage || 'Aucun message'}</div>
                         </div>
                     </div>
+                    ${user.unreadCount > 0 ? `<div class="unread-badge">${user.unreadCount}</div>` : ''}
                     <button class="delete-btn" title="Supprimer la conversation">Supprimer</button>
                 `;
 
-                // Clic pour sélectionner la conversation (sauf sur le bouton supprimer)
                 li.querySelector('.user-info').onclick = () => selectUser(user.id, user.pseudo);
                 
-                // Clic pour supprimer la conversation
                 li.querySelector('.delete-btn').onclick = (e) => {
                     e.stopPropagation();
                     if (confirm(`Voulez-vous vraiment supprimer la conversation avec ${user.pseudo} ?`)) {
@@ -146,10 +151,10 @@
             activeUserId = userId;
             chatTitle.textContent = `Discussion avec ${pseudo}`;
             chatForm.style.display = 'flex';
+            socket.emit('markAsRead', userId); // Réinitialise le compteur de non-lus
             renderMessages();
         }
 
-        // Réception d'un message client + Popup
         socket.on('newClientMessage', (data) => {
             if (!conversations[data.senderId]) conversations[data.senderId] = [];
             conversations[data.senderId].push({ author: data.author, text: data.text, file: data.file, fileType: data.fileType, type: 'client' });
