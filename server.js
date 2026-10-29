@@ -9,25 +9,55 @@ const io = new Server(server);
 
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Liste des clients connectés
+let clients = {};
+
 io.on('connection', (socket) => {
-    console.log('Un utilisateur s\'est connecté :', socket.id);
+    console.log('Nouvelle connexion :', socket.id);
 
-    // Message d'un utilisateur classique
-    socket.on('chatMessage', (data) => {
-        io.emit('chatMessage', data);
+    // Un client s'enregistre avec son pseudo
+    socket.on('registerClient', (pseudo) => {
+        clients[socket.id] = { id: socket.id, pseudo: pseudo || 'Client' };
+        // Met à jour la liste pour tous les admins connectés
+        io.emit('updateUserList', Object.values(clients));
     });
 
-    // Message personnalisé venant de l'admin avec son propre pseudo
-    socket.on('adminMessage', (data) => {
-        const adminReply = {
-            author: `👑 ${data.author}`, // Affiche le pseudo choisi avec une couronne
-            text: data.text
+    // Un client envoie un message au support
+    socket.on('clientMessage', (data) => {
+        const client = clients[socket.id];
+        if (client) {
+            const messageData = {
+                senderId: socket.id,
+                author: client.pseudo,
+                text: data.text,
+                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            };
+            // Transmet le message aux administrateurs et au client lui-même
+            io.emit('newClientMessage', messageData);
+        }
+    });
+
+    // L'administrateur répond spécifiquement à un client via son ID
+    socket.on('adminReply', (data) => {
+        const replyData = {
+            author: '👑 Support Admin',
+            text: data.text,
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         };
-        io.emit('chatMessage', adminReply);
+        // Envoie le message UNIQUEMENT au client concerné
+        io.to(data.targetSocketId).emit('privateMessage', replyData);
+        
+        // Renvoie aussi l'info aux admins pour l'historique
+        io.emit('adminReplySent', { targetSocketId: data.targetSocketId, ...replyData });
     });
 
+    // Déconnexion d'un utilisateur
     socket.on('disconnect', () => {
-        console.log('Un utilisateur s\'est déconnecté :', socket.id);
+        if (clients[socket.id]) {
+            delete clients[socket.id];
+            io.emit('updateUserList', Object.values(clients));
+        }
+        console.log('Utilisateur déconnecté :', socket.id);
     });
 });
 
