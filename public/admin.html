@@ -6,7 +6,7 @@
     <title>Messenger Admin - Support</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; height: 100vh; display: flex; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f0f2f5; height: 100vh; display: flex; position: relative; }
         
         #sidebar { width: 350px; background: white; border-right: 1px solid #ddd; display: flex; flex-direction: column; }
         .sidebar-header { padding: 20px; font-size: 1.2rem; font-weight: bold; background: #0084ff; color: white; }
@@ -20,14 +20,29 @@
         #messages { flex: 1; padding: 20px; overflow-y: auto; list-style: none; display: flex; flex-direction: column; gap: 10px; background: #fdfdfd; }
         #messages li { padding: 10px 14px; border-radius: 8px; max-width: 70%; word-break: break-word; background: #e4e6eb; }
         #messages li.admin-msg { background: #0084ff; color: white; align-self: flex-end; }
-        
-        #chat-form { display: flex; padding: 15px; border-top: 1px solid #ddd; background: #fff; gap: 10px; }
+        #messages img, #messages video { max-width: 200px; border-radius: 6px; display: block; margin-top: 5px; }
+
+        #chat-form { display: flex; padding: 15px; border-top: 1px solid #ddd; background: #fff; gap: 10px; align-items: center; }
         #msg-input { flex: 1; padding: 12px; border: 1px solid #ccc; border-radius: 20px; outline: none; }
-        button { padding: 10px 20px; background: #0084ff; color: white; border: none; border-radius: 20px; cursor: pointer; font-weight: bold; }
+        .file-btn { background: #e4e6eb; color: #333; padding: 10px 15px; border-radius: 20px; cursor: pointer; font-weight: bold; font-size: 0.9rem; }
+        .file-btn:hover { background: #d8dadf; }
+        button[type="submit"] { padding: 10px 20px; background: #0084ff; color: white; border: none; border-radius: 20px; cursor: pointer; font-weight: bold; }
+        
+        /* Popup de Notification */
+        #notification-popup { position: fixed; top: 20px; right: 20px; background: #2c3e50; color: white; padding: 15px 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); display: none; z-index: 1000; animation: fadeIn 0.3s ease-in-out; }
+        #notification-popup strong { color: #00c6ff; display: block; margin-bottom: 3px; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+        
         .no-chat { display: flex; align-items: center; justify-content: center; height: 100%; color: #888; font-size: 1.1rem; }
     </style>
 </head>
 <body>
+
+    <!-- Popup de notification -->
+    <div id="notification-popup">
+        <strong id="notif-title">Nouveau message</strong>
+        <span id="notif-text"></span>
+    </div>
 
     <div id="sidebar">
         <div class="sidebar-header">Conversations Clients</div>
@@ -40,7 +55,9 @@
         <div class="chat-header" id="current-chat-title">Sélectionnez une conversation à gauche</div>
         <ul id="messages"></ul>
         <form id="chat-form" style="display: none;">
-            <input type="text" id="msg-input" placeholder="Répondre à ce client..." autocomplete="off" required />
+            <label class="file-btn" for="file-input">📁 Fichier</label>
+            <input type="file" id="file-input" style="display: none;" accept="image/*,video/*" />
+            <input type="text" id="msg-input" placeholder="Répondre à ce client..." autocomplete="off" />
             <button type="submit">Envoyer</button>
         </form>
     </div>
@@ -55,7 +72,11 @@
         const messagesUl = document.getElementById('messages');
         const chatForm = document.getElementById('chat-form');
         const inputMsg = document.getElementById('msg-input');
+        const fileInput = document.getElementById('file-input');
         const chatTitle = document.getElementById('current-chat-title');
+        const popup = document.getElementById('notification-popup');
+        const notifTitle = document.getElementById('notif-title');
+        const notifText = document.getElementById('notif-text');
 
         socket.on('updateUserList', (users) => {
             userListUl.innerHTML = '';
@@ -63,20 +84,15 @@
                 userListUl.innerHTML = '<li style="padding:20px; color:#888;">Aucun client en ligne</li>';
                 return;
             }
-
             users.forEach(user => {
-                if (!conversations[user.id]) {
-                    conversations[user.id] = [];
-                }
+                if (!conversations[user.id]) conversations[user.id] = [];
                 const li = document.createElement('li');
                 if (user.id === activeUserId) li.classList.add('active');
-                
-                // Affichage du nom et de l'ID unique automatique
                 li.innerHTML = `
                     <div class="avatar">${user.pseudo.charAt(0).toUpperCase()}</div>
                     <div style="overflow:hidden;">
                         <strong>${user.pseudo}</strong>
-                        <div style="font-size:0.75rem; color:#666; text-overflow:ellipsis; overflow:hidden; white-space:nowrap;">ID: ${user.id}</div>
+                        <div style="font-size:0.75rem; color:#666;">ID: ${user.id}</div>
                     </div>
                 `;
                 li.onclick = () => selectUser(user.id, user.pseudo);
@@ -91,30 +107,63 @@
             renderMessages();
         }
 
+        // Réception d'un message client + affichage de la Popup
         socket.on('newClientMessage', (data) => {
-            if (!conversations[data.senderId]) {
-                conversations[data.senderId] = [];
+            if (!conversations[data.senderId]) conversations[data.senderId] = [];
+            conversations[data.senderId].push({ author: data.author, text: data.text, file: data.file, fileType: data.fileType, type: 'client' });
+            
+            if (activeUserId === data.senderId) {
+                renderMessages();
+            } else {
+                // Affichage de la Popup de notification
+                notifTitle.textContent = `Message de ${data.author}`;
+                notifText.textContent = data.text || '[Fichier multimédia]';
+                popup.style.display = 'block';
+                setTimeout(() => { popup.style.display = 'none'; }, 4000);
             }
-            conversations[data.senderId].push({ author: data.author, text: data.text, type: 'client' });
-            if (activeUserId === data.senderId) renderMessages();
         });
 
         socket.on('adminReplySent', (data) => {
-            if (!conversations[data.targetSocketId]) {
-                conversations[data.targetSocketId] = [];
-            }
-            conversations[data.targetSocketId].push({ author: data.author, text: data.text, type: 'admin' });
+            if (!conversations[data.targetSocketId]) conversations[data.targetSocketId] = [];
+            conversations[data.targetSocketId].push({ author: data.author, text: data.text, file: data.file, fileType: data.fileType, type: 'admin' });
             if (activeUserId === data.targetSocketId) renderMessages();
         });
 
+        // Envoi de la réponse (Texte et/ou Fichier)
         chatForm.addEventListener('submit', (e) => {
             e.preventDefault();
             const text = inputMsg.value.trim();
-            if (text && activeUserId) {
-                socket.emit('adminReply', { targetSocketId: activeUserId, text });
-                inputMsg.value = '';
+            const file = fileInput.files[0];
+
+            if ((text || file) && activeUserId) {
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = function(event) {
+                        socket.emit('adminReply', {
+                            targetSocketId: activeUserId,
+                            text: text,
+                            file: event.target.result,
+                            fileType: file.type
+                        });
+                        resetForm();
+                    };
+                    reader.readAsDataURL(file);
+                } else {
+                    socket.emit('adminReply', {
+                        targetSocketId: activeUserId,
+                        text: text,
+                        file: null,
+                        fileType: null
+                    });
+                    resetForm();
+                }
             }
         });
+
+        function resetForm() {
+            inputMsg.value = '';
+            fileInput.value = '';
+        }
 
         function renderMessages() {
             messagesUl.innerHTML = '';
@@ -122,7 +171,16 @@
             msgs.forEach(m => {
                 const li = document.createElement('li');
                 if (m.type === 'admin') li.classList.add('admin-msg');
-                li.innerHTML = `<strong>${m.author} :</strong> ${m.text}`;
+                
+                let content = `<strong>${m.author} :</strong> ${m.text}`;
+                if (m.file) {
+                    if (m.fileType.startsWith('image/')) {
+                        content += `<img src="${m.file}" alt="image"/>`;
+                    } else if (m.fileType.startsWith('video/')) {
+                        content += `<video src="${m.file}" controls></video>`;
+                    }
+                }
+                li.innerHTML = content;
                 messagesUl.appendChild(li);
             });
             messagesUl.scrollTop = messagesUl.scrollHeight;
