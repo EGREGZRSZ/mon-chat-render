@@ -5,7 +5,9 @@ const path = require('path');
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
+const io = new Server(server, {
+    maxHttpBufferSize: 10 * 1024 * 1024 // Permet d'envoyer des fichiers jusqu'à 10 Mo
+});
 
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -13,8 +15,6 @@ let clients = {};
 
 io.on('connection', (socket) => {
     const uniqueId = socket.id;
-    
-    // Génération automatique d'un pseudo unique basé sur l'ID
     const randomPseudo = `Utilisateur_${uniqueId.substring(0, 5)}`;
     
     clients[uniqueId] = { 
@@ -23,43 +23,42 @@ io.on('connection', (socket) => {
         joinedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     };
 
-    console.log(`Nouveau client connecté automatiquement : ${randomPseudo} (${uniqueId})`);
-    
-    // Diffuse la liste actualisée aux admins
     io.emit('updateUserList', Object.values(clients));
 
-    // Message d'un client
+    // Réception d'un message (texte ou multimédia) du client
     socket.on('clientMessage', (data) => {
         const client = clients[uniqueId];
         if (client) {
             const messageData = {
                 senderId: uniqueId,
                 author: client.pseudo,
-                text: data.text,
+                text: data.text || '',
+                file: data.file || null, // Données du fichier multimédia
+                fileType: data.fileType || null,
                 time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
             };
             io.emit('newClientMessage', messageData);
         }
     });
 
-    // Réponse de l'admin vers un ID unique précis
+    // Réponse de l'admin (texte ou multimédia) vers un client précis
     socket.on('adminReply', (data) => {
         const replyData = {
             author: '👑 Support Admin',
-            text: data.text,
+            text: data.text || '',
+            file: data.file || null,
+            fileType: data.fileType || null,
             time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         };
         io.to(data.targetSocketId).emit('privateMessage', replyData);
         io.emit('adminReplySent', { targetSocketId: data.targetSocketId, ...replyData });
     });
 
-    // Déconnexion
     socket.on('disconnect', () => {
         if (clients[uniqueId]) {
             delete clients[uniqueId];
             io.emit('updateUserList', Object.values(clients));
         }
-        console.log('Utilisateur déconnecté :', uniqueId);
     });
 });
 
