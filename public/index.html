@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="fr" class="h-full bg-slate-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Support Client - Chat</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        .chat-shadow {
+            box-shadow: 0 4px 15px -3px rgba(0, 0, 0, 0.05), 0 2px 6px -2px rgba(0, 0, 0, 0.02);
+        }
+    </style>
+</head>
+<body class="h-full font-sans antialiased text-slate-800 bg-slate-100 flex flex-col justify-between overflow-hidden">
+
+    <!-- Main Application Viewport -->
+    <main class="w-full h-full flex flex-col justify-between overflow-hidden bg-white max-w-md mx-auto shadow-xl sm:border-x sm:border-slate-200 relative">
+
+        <!-- App Body -->
+        <div class="flex-1 flex overflow-hidden relative bg-slate-50">
+
+            <!-- MAIN CHAT AREA -->
+            <section class="flex-1 flex flex-col h-full bg-[#f8fafc] relative min-w-0">
+                
+                <!-- Chat Header Bar -->
+                <div class="bg-white border-b border-slate-200/80 px-3 py-2.5 flex items-center justify-between shadow-xs z-10">
+                    <div class="flex items-center space-x-2 min-w-0">
+                        <div class="flex items-center space-x-2.5 min-w-0">
+                            <div class="relative flex-shrink-0">
+                                <div class="w-9 h-9 rounded-full overflow-hidden bg-blue-600 text-white flex items-center justify-center font-bold text-sm shadow-xs">
+                                    S
+                                </div>
+                            </div>
+                            <div class="truncate">
+                                <h2 class="text-sm font-bold text-slate-900 leading-tight truncate">Support en direct</h2>
+                                <p class="text-[11px] text-emerald-500 font-medium flex items-center gap-1">
+                                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span> En ligne
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Chat Scrollable Feed -->
+                <div id="messages" class="flex-1 overflow-y-auto p-3.5 space-y-4">
+                    <!-- Date Badge -->
+                    <div class="flex justify-center my-1">
+                        <span class="text-[10px] font-semibold uppercase tracking-wider bg-slate-200/70 text-slate-600 px-3 py-0.5 rounded-full">Aujourd'hui</span>
+                    </div>
+
+                    <!-- Message d'accueil du support -->
+                    <div class="flex items-end space-x-2 max-w-[88%] sm:max-w-[80%]">
+                        <div class="w-7 h-7 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs mb-1 flex-shrink-0 shadow-xs">
+                            S
+                        </div>
+                        <div>
+                            <div class="bg-white p-3 rounded-2xl rounded-bl-xs chat-shadow border border-slate-100 space-y-1">
+                                <p class="text-xs text-slate-800 font-normal leading-relaxed">
+                                    Bonjour ! Comment pouvons-nous vous aider aujourd'hui ? Vous pouvez nous écrire ou partager des médias.
+                                </p>
+                                <div class="flex justify-end text-[10px] text-slate-400 font-medium">
+                                    Maintenant
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Input Footer Bar -->
+                <div class="p-2.5 bg-white border-t border-slate-200/80">
+                    <form id="chat-form" class="flex items-center space-x-1.5">
+                        <label class="p-2 text-slate-500 hover:text-blue-600 hover:bg-slate-100 rounded-full transition cursor-pointer" title="Envoyer une image ou vidéo">
+                            <i class="fa-solid fa-plus text-sm"></i>
+                            <input type="file" id="file-input" style="display: none;" accept="image/*,video/*,audio/*" />
+                        </label>
+                        <button type="button" id="record-btn" class="p-2 text-slate-500 hover:text-blue-600 hover:bg-slate-100 rounded-full transition" title="Message vocal">
+                            <i class="fa-solid fa-microphone text-sm"></i>
+                        </button>
+                        
+                        <div class="flex-1 flex items-center bg-slate-100 rounded-full px-3 py-1.5 focus-within:bg-white focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 border border-transparent transition">
+                            <input id="msg-input" type="text" placeholder="Écrivez votre message..." class="w-full bg-transparent text-xs text-slate-800 placeholder-slate-400 focus:outline-none" autocomplete="off">
+                        </div>
+
+                        <button type="submit" class="w-9 h-9 bg-blue-600 hover:bg-blue-700 text-white rounded-full flex items-center justify-center shadow-md transition active:scale-95 flex-shrink-0">
+                            <i class="fa-solid fa-paper-plane text-xs"></i>
+                        </button>
+                    </form>
+                </div>
+
+            </section>
+        </div>
+    </main>
+
+    <!-- Modale de Visionnage Multimédia -->
+    <div id="media-modal" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: none; justify-content: center; align-items: center; z-index: 2000; cursor: pointer;">
+        <span id="close-modal" style="position: absolute; top: 20px; right: 30px; color: white; font-size: 2rem; font-weight: bold; cursor: pointer;">&times;</span>
